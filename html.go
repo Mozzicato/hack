@@ -23,7 +23,7 @@ const indexHTML = `<!doctype html>
 </style>
 </head>
 <body class="text-slate-100 min-h-screen">
-<div class="max-w-6xl mx-auto px-4 pb-28">
+<div class="max-w-6xl mx-auto px-4 pb-10">
 
   <!-- nav -->
   <header class="flex items-center justify-between py-5">
@@ -59,26 +59,24 @@ const indexHTML = `<!doctype html>
   </section>
 
   <!-- kanban -->
-  <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+  <section class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
     <div data-col="todo"></div>
     <div data-col="doing"></div>
     <div data-col="done"></div>
   </section>
-</div>
 
-<!-- chat dock -->
-<div class="fixed bottom-0 inset-x-0 border-t border-white/10 bg-slate-900/85 backdrop-blur">
-  <div class="max-w-6xl mx-auto px-4 py-3">
-    <div class="flex items-center gap-2 mb-2">
-      <span class="text-xs font-semibold text-slate-300">💬 Live chat</span>
+  <!-- chat -->
+  <section class="bg-slate-800/60 backdrop-blur rounded-2xl p-4 ring-1 ring-white/5">
+    <div class="flex items-center gap-2 mb-3">
+      <span class="text-sm font-semibold text-slate-200">💬 Live chat</span>
       <span class="text-[10px] text-slate-500">native WebSocket</span>
     </div>
-    <ul id="chat" class="flex gap-2 overflow-x-auto pb-2 text-xs"></ul>
-    <div class="flex gap-2 mt-1">
-      <input id="msg" placeholder="Message the team…" class="flex-1 bg-slate-800 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-cyan-500/60" onkeydown="if(event.key==='Enter')sendChat()"/>
+    <ul id="chat" class="space-y-1.5 text-sm mb-3 max-h-48 overflow-y-auto pr-1"></ul>
+    <div class="flex gap-2">
+      <input id="msg" placeholder="Message the team…" class="flex-1 bg-slate-900/70 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-cyan-500/60" onkeydown="if(event.key==='Enter')sendChat()"/>
       <button onclick="sendChat()" class="bg-cyan-600 hover:bg-cyan-500 rounded-xl px-5 text-sm font-medium">Send</button>
     </div>
-  </div>
+  </section>
 </div>
 
 <script>
@@ -122,9 +120,11 @@ async function refresh(){
     stat("In Progress", a.tasksByStatus.doing, "⚡") + stat("Done", a.tasksByStatus.done, "✅");
 
   var chat = await (await api("/api/chat")).json();
-  document.getElementById("chat").innerHTML = chat.slice(-30).map(function(m){
-    return '<li class="shrink-0 bg-slate-800 rounded-full px-3 py-1.5"><b class="text-cyan-400">'+esc(m.user)+'</b> '+esc(m.text)+'</li>';
+  var cl = document.getElementById("chat");
+  cl.innerHTML = chat.slice(-30).map(function(m){
+    return '<li class="fade"><b class="text-cyan-400">'+esc(m.user)+':</b> <span class="text-slate-200">'+esc(m.text)+'</span></li>';
   }).join("");
+  cl.scrollTop = cl.scrollHeight;
 }
 
 function stat(label, val, icon){
