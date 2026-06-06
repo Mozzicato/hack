@@ -229,6 +229,7 @@ func main() {
 	// 10 core API endpoints ----------------------------------------------
 	mux.HandleFunc("POST /api/auth/register", app.register) // 1
 	mux.HandleFunc("POST /api/auth/login", app.login)       // 2
+	mux.HandleFunc("GET /api/auth/guest", app.guest)        // zero-friction session
 	mux.HandleFunc("GET /api/auth/me", app.authH(app.me))   // 3
 	mux.HandleFunc("GET /api/users", app.authH(app.users))  // 4
 	mux.HandleFunc("GET /api/tasks", app.authH(app.listTasks))         // 5
@@ -350,6 +351,26 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeErr(w, 401, "invalid credentials")
+}
+
+// guest issues a token for a shared guest user — lets the UI work with zero
+// login friction while keeping the auth layer (middleware) fully intact.
+func (a *App) guest(w http.ResponseWriter, r *http.Request) {
+	a.store.mu.Lock()
+	var g *User
+	for _, u := range a.store.users {
+		if u.Role == "guest" {
+			g = u
+			break
+		}
+	}
+	if g == nil {
+		g = &User{ID: a.store.nextID("usr"), Name: "Guest", Email: "guest@taskboard.dev",
+			Role: "guest", Created: time.Now().Unix()}
+		a.store.users[g.ID] = g
+	}
+	a.store.mu.Unlock()
+	writeJSON(w, 200, map[string]any{"token": signToken(g.ID, g.Role), "user": g})
 }
 
 func (a *App) me(w http.ResponseWriter, r *http.Request) {

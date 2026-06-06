@@ -1,95 +1,192 @@
 package main
 
 // indexHTML is the mobile-first Tailwind UI, served at GET /.
-// Tailwind via CDN keeps the binary tiny while staying responsive.
+// No login screen: the page silently opens a guest session on load.
+// NOTE: this is a Go raw string (backtick-delimited) — do NOT use backticks
+// anywhere inside (JS uses string concatenation, not template literals).
 const indexHTML = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<meta name="theme-color" content="#0f172a"/>
+<meta name="theme-color" content="#0b1120"/>
 <title>TaskBoard · quikdb-frame</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body{background:radial-gradient(1200px 600px at 10% -10%,#1e293b 0%,#0b1120 55%)}
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-thumb{background:#334155;border-radius:8px}
+  .card{transition:transform .12s ease, box-shadow .12s ease}
+  .card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.35)}
+  .fade{animation:f .25s ease}
+  @keyframes f{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+</style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen">
-<div class="max-w-md mx-auto p-4 sm:max-w-3xl">
-  <header class="flex items-center justify-between py-4">
-    <h1 class="text-xl font-bold">📋 TaskBoard <span class="text-xs text-emerald-400 align-top">quikdb-frame</span></h1>
-    <span id="ws" class="text-xs px-2 py-1 rounded bg-slate-700">ws: …</span>
+<body class="text-slate-100 min-h-screen">
+<div class="max-w-6xl mx-auto px-4 pb-28">
+
+  <!-- nav -->
+  <header class="flex items-center justify-between py-5">
+    <div class="flex items-center gap-3">
+      <div class="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 grid place-items-center text-xl shadow-lg">📋</div>
+      <div>
+        <h1 class="text-lg font-bold leading-tight">TaskBoard</h1>
+        <p class="text-[11px] text-slate-400 -mt-0.5">powered by <span class="text-emerald-400 font-medium">quikdb-frame</span></p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 text-xs">
+      <span id="who" class="hidden sm:inline px-2.5 py-1 rounded-full bg-slate-800/70 text-slate-300"></span>
+      <span id="ws" class="px-2.5 py-1 rounded-full bg-slate-800/70 flex items-center gap-1.5">
+        <span id="dot" class="h-2 w-2 rounded-full bg-amber-400"></span><span id="wsText">connecting</span>
+      </span>
+    </div>
   </header>
 
-  <section id="auth" class="bg-slate-800 rounded-xl p-4 mb-4">
-    <div class="flex gap-2 mb-3 text-sm">
-      <input id="email" placeholder="email" value="admin@taskboard.dev" class="flex-1 bg-slate-700 rounded px-3 py-2"/>
-      <input id="pw" type="password" placeholder="password" value="admin123" class="flex-1 bg-slate-700 rounded px-3 py-2"/>
+  <!-- stats -->
+  <section id="stats" class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6"></section>
+
+  <!-- add task -->
+  <section class="bg-slate-800/60 backdrop-blur rounded-2xl p-3 sm:p-4 mb-6 ring-1 ring-white/5">
+    <div class="flex flex-col sm:flex-row gap-2">
+      <input id="title" placeholder="What needs doing?" class="flex-1 bg-slate-900/70 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500/60" onkeydown="if(event.key==='Enter')addTask()"/>
+      <select id="prio" class="bg-slate-900/70 rounded-xl px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500/60">
+        <option value="low">Low</option>
+        <option value="medium" selected>Medium</option>
+        <option value="high">High</option>
+      </select>
+      <button onclick="addTask()" class="bg-gradient-to-r from-emerald-500 to-cyan-500 hover:opacity-90 rounded-xl px-6 py-3 text-sm font-semibold shadow-lg">+ Add task</button>
     </div>
-    <div class="flex gap-2">
-      <button onclick="login()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 rounded py-2 text-sm font-medium">Login</button>
-      <button onclick="register()" class="flex-1 bg-slate-600 hover:bg-slate-500 rounded py-2 text-sm">Register</button>
-    </div>
-    <p id="who" class="text-xs text-slate-400 mt-2"></p>
   </section>
 
-  <section class="grid grid-cols-3 gap-2 mb-4" id="stats"></section>
-
-  <section class="bg-slate-800 rounded-xl p-4 mb-4">
-    <div class="flex gap-2 mb-3">
-      <input id="title" placeholder="New task…" class="flex-1 bg-slate-700 rounded px-3 py-2 text-sm"/>
-      <button onclick="addTask()" class="bg-emerald-600 hover:bg-emerald-500 rounded px-4 text-sm">Add</button>
-    </div>
-    <ul id="tasks" class="space-y-2"></ul>
-  </section>
-
-  <section class="bg-slate-800 rounded-xl p-4">
-    <h2 class="text-sm font-semibold mb-2">💬 Live Chat (native WebSocket)</h2>
-    <ul id="chat" class="space-y-1 text-sm mb-2 max-h-40 overflow-y-auto"></ul>
-    <div class="flex gap-2">
-      <input id="msg" placeholder="Message…" class="flex-1 bg-slate-700 rounded px-3 py-2 text-sm" onkeydown="if(event.key==='Enter')sendChat()"/>
-      <button onclick="sendChat()" class="bg-emerald-600 hover:bg-emerald-500 rounded px-4 text-sm">Send</button>
-    </div>
+  <!-- kanban -->
+  <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div data-col="todo"></div>
+    <div data-col="doing"></div>
+    <div data-col="done"></div>
   </section>
 </div>
 
-<script>
-let token = localStorage.getItem("tb_token") || "";
-const api = (p, opt={}) => fetch(p, {...opt, headers:{"Content-Type":"application/json","Authorization":"Bearer "+token, ...(opt.headers||{})}});
+<!-- chat dock -->
+<div class="fixed bottom-0 inset-x-0 border-t border-white/10 bg-slate-900/85 backdrop-blur">
+  <div class="max-w-6xl mx-auto px-4 py-3">
+    <div class="flex items-center gap-2 mb-2">
+      <span class="text-xs font-semibold text-slate-300">💬 Live chat</span>
+      <span class="text-[10px] text-slate-500">native WebSocket</span>
+    </div>
+    <ul id="chat" class="flex gap-2 overflow-x-auto pb-2 text-xs"></ul>
+    <div class="flex gap-2 mt-1">
+      <input id="msg" placeholder="Message the team…" class="flex-1 bg-slate-800 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-cyan-500/60" onkeydown="if(event.key==='Enter')sendChat()"/>
+      <button onclick="sendChat()" class="bg-cyan-600 hover:bg-cyan-500 rounded-xl px-5 text-sm font-medium">Send</button>
+    </div>
+  </div>
+</div>
 
-async function login(){ const r = await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email.value,password:pw.value})}); auth(await r.json()); }
-async function register(){ const r = await fetch("/api/auth/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:email.value.split("@")[0],email:email.value,password:pw.value})}); auth(await r.json()); }
-function auth(d){ if(!d.token){who.textContent=d.error||"failed";return;} token=d.token; localStorage.setItem("tb_token",token); who.textContent="Signed in as "+d.user.name+" ("+d.user.role+")"; refresh(); }
+<script>
+var token = "";
+var COLS = {todo:{name:"To Do",accent:"slate"}, doing:{name:"In Progress",accent:"amber"}, done:{name:"Done",accent:"emerald"}};
+var PRIO = {high:"bg-rose-500/20 text-rose-300", medium:"bg-amber-500/20 text-amber-300", low:"bg-emerald-500/20 text-emerald-300"};
+
+function api(p, opt){ opt = opt || {}; opt.headers = Object.assign({"Content-Type":"application/json","Authorization":"Bearer "+token}, opt.headers||{}); return fetch(p, opt); }
+function esc(s){ return (s||"").replace(/[&<>"]/g, function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
+
+async function boot(){
+  var r = await fetch("/api/auth/guest");
+  var d = await r.json();
+  token = d.token;
+  document.getElementById("who").textContent = "👤 " + d.user.name;
+  connect();
+  refresh();
+  setInterval(refresh, 8000);
+}
 
 async function refresh(){
   if(!token) return;
-  const tasks = await (await api("/api/tasks")).json();
-  document.getElementById("tasks").innerHTML = tasks.map(t=>
-    '<li class="flex items-center justify-between bg-slate-700 rounded px-3 py-2 text-sm">'+
-    '<span><b>'+t.title+'</b> <em class="text-xs text-slate-400">'+t.status+'</em></span>'+
-    '<span class="flex gap-2"><button onclick="cycle(\''+t.id+'\',\''+t.status+'\')" class="text-emerald-400">↻</button>'+
-    '<button onclick="del(\''+t.id+'\')" class="text-rose-400">✕</button></span></li>').join("");
-  const a = await (await api("/api/analytics")).json();
+  var tasks = await (await api("/api/tasks")).json();
+  var groups = {todo:[],doing:[],done:[]};
+  tasks.forEach(function(t){ (groups[t.status]||groups.todo).push(t); });
+  Object.keys(COLS).forEach(function(k){
+    var col = document.querySelector('[data-col="'+k+'"]');
+    var items = groups[k];
+    var cards = items.map(cardHTML).join("") || '<p class="text-xs text-slate-500 py-6 text-center">Nothing here</p>';
+    col.innerHTML =
+      '<div class="flex items-center justify-between mb-3 px-1">'+
+        '<h2 class="text-sm font-semibold text-slate-200">'+COLS[k].name+'</h2>'+
+        '<span class="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">'+items.length+'</span>'+
+      '</div>'+
+      '<div class="space-y-3 min-h-[40px]">'+cards+'</div>';
+  });
+
+  var a = await (await api("/api/analytics")).json();
   document.getElementById("stats").innerHTML =
-    card("Users",a.totalUsers)+card("Tasks",a.totalTasks)+card("Done",a.tasksByStatus.done);
-  const chat = await (await api("/api/chat")).json();
-  renderChat(chat);
+    stat("Total", a.totalTasks, "📦") + stat("To Do", a.tasksByStatus.todo, "🗒️") +
+    stat("In Progress", a.tasksByStatus.doing, "⚡") + stat("Done", a.tasksByStatus.done, "✅");
+
+  var chat = await (await api("/api/chat")).json();
+  document.getElementById("chat").innerHTML = chat.slice(-30).map(function(m){
+    return '<li class="shrink-0 bg-slate-800 rounded-full px-3 py-1.5"><b class="text-cyan-400">'+esc(m.user)+'</b> '+esc(m.text)+'</li>';
+  }).join("");
 }
-const card=(k,v)=>'<div class="bg-slate-800 rounded-xl p-3 text-center"><div class="text-2xl font-bold">'+v+'</div><div class="text-xs text-slate-400">'+k+'</div></div>';
-async function addTask(){ if(!title.value)return; await api("/api/tasks",{method:"POST",body:JSON.stringify({title:title.value})}); title.value=""; }
-async function cycle(id,s){ const n={todo:"doing",doing:"done",done:"todo"}[s]; await api("/api/tasks/"+id,{method:"PUT",body:JSON.stringify({status:n})}); }
+
+function stat(label, val, icon){
+  return '<div class="card bg-slate-800/60 ring-1 ring-white/5 rounded-2xl p-4">'+
+    '<div class="text-2xl">'+icon+'</div>'+
+    '<div class="text-3xl font-bold mt-1">'+(val||0)+'</div>'+
+    '<div class="text-xs text-slate-400">'+label+'</div></div>';
+}
+
+function cardHTML(t){
+  var canBack = t.status!=="todo", canFwd = t.status!=="done";
+  return '<div class="card fade bg-slate-800 rounded-xl p-3 ring-1 ring-white/5">'+
+    '<div class="flex items-start justify-between gap-2">'+
+      '<p class="text-sm font-medium leading-snug">'+esc(t.title)+'</p>'+
+      '<button onclick="del(\''+t.id+'\')" class="text-slate-500 hover:text-rose-400 text-sm">✕</button>'+
+    '</div>'+
+    (t.description?'<p class="text-xs text-slate-400 mt-1">'+esc(t.description)+'</p>':'')+
+    '<div class="flex items-center justify-between mt-3">'+
+      '<span class="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full '+(PRIO[t.priority]||PRIO.medium)+'">'+esc(t.priority)+'</span>'+
+      '<div class="flex gap-1">'+
+        (canBack?'<button onclick="move(\''+t.id+'\',-1)" class="h-7 w-7 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs">◀</button>':'')+
+        (canFwd?'<button onclick="move(\''+t.id+'\',1)" class="h-7 w-7 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs">▶</button>':'')+
+      '</div>'+
+    '</div></div>';
+}
+
+var ORDER=["todo","doing","done"];
+async function addTask(){
+  var t=document.getElementById("title"), p=document.getElementById("prio");
+  if(!t.value.trim()) return;
+  await api("/api/tasks",{method:"POST",body:JSON.stringify({title:t.value.trim(),priority:p.value})});
+  t.value=""; refresh();
+}
+async function move(id,dir){
+  var cards = await (await api("/api/tasks")).json();
+  var t = cards.find(function(x){return x.id===id;}); if(!t) return;
+  var i = ORDER.indexOf(t.status)+dir; if(i<0||i>2) return;
+  await api("/api/tasks/"+id,{method:"PUT",body:JSON.stringify({status:ORDER[i]})}); refresh();
+}
 async function del(id){ await api("/api/tasks/"+id,{method:"DELETE"}); refresh(); }
 
-function renderChat(c){ document.getElementById("chat").innerHTML=c.map(m=>'<li><b class="text-emerald-400">'+m.user+':</b> '+m.text+'</li>').join(""); }
-function sendChat(){ if(!msg.value)return; if(ws&&ws.readyState===1){ws.send(JSON.stringify({text:msg.value,user:"me"}));} else {api("/api/chat",{method:"POST",body:JSON.stringify({text:msg.value})}).then(refresh);} msg.value=""; }
-
-let ws;
-function connect(){
-  const proto = location.protocol==="https:"?"wss":"ws";
-  ws = new WebSocket(proto+"://"+location.host+"/ws");
-  ws.onopen=()=>document.getElementById("ws").textContent="ws: live";
-  ws.onclose=()=>{document.getElementById("ws").textContent="ws: off"; setTimeout(connect,1500);};
-  ws.onmessage=(e)=>{ const m=JSON.parse(e.data); if(m.event==="chat.message"||m.event&&m.event.startsWith("task.")) refresh(); };
+function sendChat(){
+  var m=document.getElementById("msg"); if(!m.value.trim()) return;
+  if(ws && ws.readyState===1){ ws.send(JSON.stringify({text:m.value.trim(),user:"Guest"})); }
+  else { api("/api/chat",{method:"POST",body:JSON.stringify({text:m.value.trim()})}).then(refresh); }
+  m.value="";
 }
-connect();
-if(token) refresh();
+
+var ws;
+function connect(){
+  var proto = location.protocol==="https:"?"wss":"ws";
+  ws = new WebSocket(proto+"://"+location.host+"/ws");
+  ws.onopen = function(){ setWs(true); };
+  ws.onclose = function(){ setWs(false); setTimeout(connect,1500); };
+  ws.onmessage = function(e){ try{ var m=JSON.parse(e.data); if(m.event==="chat.message"||(m.event&&m.event.indexOf("task.")===0)) refresh(); }catch(_){} };
+}
+function setWs(on){
+  document.getElementById("dot").className = "h-2 w-2 rounded-full "+(on?"bg-emerald-400 animate-pulse":"bg-rose-400");
+  document.getElementById("wsText").textContent = on?"live":"offline";
+}
+
+boot();
 </script>
 </body>
 </html>`
