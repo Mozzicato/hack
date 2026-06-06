@@ -1,0 +1,4 @@
+# build artifacts
+*.exe
+app
+taskboard

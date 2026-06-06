@@ -1,0 +1,8 @@
+{
+  "buildCommand": "go build -trimpath -ldflags '-s -w' -o app .",
+  "startCommand": "./app",
+  "envVars": {
+    "JWT_SECRET": "change-me-in-prod",
+    "MONGODB_URI": ""
+  }
+}
